@@ -41,9 +41,24 @@ button:hover:not(:disabled), select:hover { border-color: var(--ink); }
 button:focus-visible, select:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 button:disabled { opacity: .4; cursor: default; }
 button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-.stat-diff { cursor: pointer; }
-.stat-diff select { font: 500 15px/22px var(--mono); color: var(--ink); text-align: right; text-align-last: right; border: 0; border-radius: 6px; background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b7078' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right center / 9px 6px; padding: 0 14px 0 0; height: 22px; -webkit-appearance: none; appearance: none; }
-.stat-diff select:hover { color: var(--muted); }
+.stat-diff { position: relative; }
+.diff-btn { all: unset; display: grid; gap: 2px; text-align: right; cursor: pointer; border-radius: 6px; }
+.diff-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+.diff-btn span { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.diff-btn svg { width: 8px; height: 5px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s; }
+.diff-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.diff-btn:hover b { color: var(--muted); }
+.diff-menu { position: absolute; top: calc(100% + 10px); right: -8px; z-index: 30; min-width: 212px; background: var(--paper); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 18px 40px rgba(21, 23, 28, .14), 0 2px 6px rgba(21, 23, 28, .06); padding: 6px; display: grid; gap: 2px; transform-origin: top right; animation: menuIn .18s cubic-bezier(.2, .9, .3, 1.2); }
+.diff-menu[hidden] { display: none; }
+.diff-opt { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 1fr auto 16px; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 11px; cursor: pointer; text-align: left; }
+.diff-opt:hover { background: var(--bg); }
+.diff-opt:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.diff-opt .name { font: 500 17px var(--mono); color: var(--ink); text-transform: none; letter-spacing: 0; }
+.diff-opt .meta { font: 400 11.5px var(--mono); color: var(--muted); letter-spacing: .02em; text-transform: none; }
+.diff-opt .tick { width: 14px; height: 14px; fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+.diff-opt[aria-selected="true"] .tick { opacity: 1; }
+@keyframes menuIn { from { opacity: 0; transform: translateY(-4px) scale(.97); } }
+@media (prefers-reduced-motion: reduce) { .diff-menu { animation: none; } }
 select { padding: 7px 12px; }
 
 
@@ -68,8 +83,8 @@ select { padding: 7px 12px; }
 .next-halo { animation: pulse 1.6s ease-in-out infinite; }
 @keyframes draw { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .next-halo, .seg.new, .win { animation: none; } .circle-piece { transition: none; } }
-@media (max-width: 380px) { header { gap: 6px; } h1 { font-size: 22px !important; } .stats { gap: 9px !important; } .home-btn { width: 28px; height: 28px; } }
-@media (max-width: 420px) { h1 { font-size: 26px; } .stats { gap: 12px; } .stat b { font-size: 19px; } .stat-diff select { font-size: 13.5px; height: 19px; line-height: 19px; } }
+@media (max-width: 380px) { header { gap: 6px; } h1 { font-size: 22px !important; } .stats { gap: 8px !important; } .stat span { letter-spacing: .04em; } .home-btn { width: 28px; height: 28px; } }
+@media (max-width: 420px) { h1 { font-size: 26px; } .stats { gap: 12px; } .stat b { font-size: 19px; } }
 .help-row { display: flex; justify-content: center; border-top: 1px solid var(--line); padding-top: 14px; }
 .help-btn { display: inline-flex; align-items: center; gap: 8px; }
 .help-btn i { font-style: normal; font-family: var(--display); font-weight: 700; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: var(--paper); display: grid; place-items: center; font-size: 13px; }
@@ -186,15 +201,19 @@ select { padding: 7px 12px; }
       <div class="puzzle-id" id="puzzleId">Puzzle</div>
     </div>
     <div class="stats">
-      <label class="stat stat-diff" for="diffSel">
-        <select id="diffSel" aria-label="Difficulty">
+      <div class="stat stat-diff">
+        <select id="diffSel" aria-hidden="true" tabindex="-1" hidden>
           <option value="0">Easy</option>
           <option value="1" selected>Medium</option>
           <option value="2">Hard</option>
           <option value="3">Expert</option>
         </select>
-        <span>Difficulty</span>
-      </label>
+        <button id="diffBtn" type="button" class="diff-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="Difficulty">
+          <b id="diffVal">Medium</b>
+          <span>Difficulty<svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg></span>
+        </button>
+        <div class="diff-menu" id="diffMenu" role="listbox" aria-label="Difficulty" hidden></div>
+      </div>
       <div class="stat"><b id="segCount">0</b><span>Lines</span></div>
       <div class="stat"><b id="parCount">–</b><span>Par</span></div>
       <div class="stat"><b id="leftCount">0</b><span>Left</span></div>
@@ -496,9 +515,9 @@ const SFX = (function () {
     node.connect(dry);
     if (wetAmt) { const s = ctx.createGain(); s.gain.value = wetAmt; node.connect(s).connect(wet); }
   }
-  function noiseBurst(t, { freq, q = 1, peak, attack = 0.001, decay, sweepTo, wetAmt = 0.2 }) {
+  function noiseBurst(t, { type = "bandpass", freq, q = 1, peak, attack = 0.001, decay, sweepTo, wetAmt = 0.2 }) {
     const src = ctx.createBufferSource(); src.buffer = noise;
-    const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.Q.value = q; f.frequency.setValueAtTime(freq, t);
+    const f = ctx.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(freq, t);
     if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, t + attack + decay);
     const g = ctx.createGain(); env(g, t, peak, attack, decay);
     src.connect(f).connect(g); out(g, wetAmt);
@@ -523,8 +542,9 @@ const SFX = (function () {
     // placing a dot: a deep, wooden click
     tap() {
       if (!ready()) return; const t = ctx.currentTime + 0.005;
-      tone(t, { freq: 150, to: 62, peak: 0.42, decay: 0.09, wetAmt: 0.15 });
-      noiseBurst(t, { freq: 1700, q: 1.4, peak: 0.16, decay: 0.03, wetAmt: 0.1 });
+      tone(t, { freq: 118, to: 46, peak: 0.38, attack: 0.003, decay: 0.22, wetAmt: 0.38 });
+      tone(t, { freq: 236, to: 150, peak: 0.05, attack: 0.002, decay: 0.1, wetAmt: 0.38 });
+      noiseBurst(t, { type: "lowpass", freq: 900, q: 0.7, peak: 0.09, attack: 0.002, decay: 0.05, wetAmt: 0.3 });
     },
     // cutting a circle: a breathy swish with a quiet glassy note
     slice(i = 0, delay = 0) {
@@ -537,20 +557,20 @@ const SFX = (function () {
     // a move that isn't allowed: two muffled low knocks
     bad() {
       if (!ready()) return; const t = ctx.currentTime + 0.005;
-      tone(t, { freq: 105, to: 80, peak: 0.3, decay: 0.11, wetAmt: 0.05 });
-      tone(t + 0.085, { freq: 92, to: 70, peak: 0.24, decay: 0.12, wetAmt: 0.05 });
+      tone(t, { freq: 92, to: 64, peak: 0.3, attack: 0.003, decay: 0.16, wetAmt: 0.25 });
+      tone(t + 0.1, { freq: 82, to: 56, peak: 0.24, attack: 0.003, decay: 0.18, wetAmt: 0.25 });
     },
     // undo: a softer, lower click
     undo() {
       if (!ready()) return; const t = ctx.currentTime + 0.005;
-      tone(t, { freq: 95, to: 55, peak: 0.28, decay: 0.08, wetAmt: 0.1 });
-      noiseBurst(t, { freq: 1100, q: 1.2, peak: 0.08, decay: 0.025, wetAmt: 0.05 });
+      tone(t, { freq: 90, to: 38, peak: 0.3, attack: 0.003, decay: 0.2, wetAmt: 0.35 });
+      noiseBurst(t, { type: "lowpass", freq: 650, q: 0.7, peak: 0.06, attack: 0.002, decay: 0.045, wetAmt: 0.3 });
     },
-    // buttons: a tiny tick
+    // buttons: a tiny, muted tick
     ui() {
       if (!ready()) return; const t = ctx.currentTime + 0.005;
-      noiseBurst(t, { freq: 2600, q: 2, peak: 0.07, decay: 0.018, wetAmt: 0.05 });
-      tone(t, { freq: 220, to: 120, peak: 0.08, decay: 0.04, wetAmt: 0 });
+      tone(t, { freq: 150, to: 80, peak: 0.1, attack: 0.002, decay: 0.1, wetAmt: 0.3 });
+      noiseBurst(t, { type: "lowpass", freq: 1100, q: 0.7, peak: 0.04, attack: 0.002, decay: 0.03, wetAmt: 0.25 });
     },
     // solved: a slow, rising pentatonic chime
     win(stars = 3) {
@@ -865,7 +885,50 @@ if (typeof document !== "undefined") (function () {
   }
   ["soundBtn", "soundBtnTitle"].forEach(id => { $(id).onclick = () => { SFX.toggle?.(); syncSound(); }; });
   syncSound();
-  $("diffSel").onchange = () => { store("lattice.diff", $("diffSel").value); S.demoIdx = null; newPuzzle(); };
+  $("diffSel").onchange = () => { store("lattice.diff", $("diffSel").value); S.demoIdx = null; newPuzzle(); syncDiff(); };
+
+  // difficulty picker: a custom menu over the hidden <select>, which stays the source of truth
+  const TICK = '<svg class="tick" viewBox="0 0 14 14"><path d="M2.5 7.5l3 3 6-7"/></svg>';
+  function syncDiff() { $("diffVal").textContent = DIFFS[+$("diffSel").value].name; }
+  function openDiff() {
+    const menu = $("diffMenu"), cur = +$("diffSel").value;
+    menu.innerHTML = "";
+    DIFFS.forEach((d, i) => {
+      const solved = FREE_SEEDS.filter(sd => progress[pkey(i, sd)]).length;
+      const meta = unlocked ? `par ${d.par[0]}–${d.par[1]}` : `${solved}/${FREE_SEEDS.length} free`;
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "diff-opt"; b.setAttribute("role", "option");
+      b.setAttribute("aria-selected", String(i === cur));
+      b.innerHTML = `<span class="name">${d.name}</span><span class="meta">${meta}</span>${TICK}`;
+      b.onclick = () => pickDiff(i);
+      menu.appendChild(b);
+    });
+    menu.hidden = false;
+    $("diffBtn").setAttribute("aria-expanded", "true");
+    menu.children[cur].focus({ preventScroll: true });
+  }
+  function closeDiff(focusBtn) {
+    if ($("diffMenu").hidden) return;
+    $("diffMenu").hidden = true;
+    $("diffBtn").setAttribute("aria-expanded", "false");
+    if (focusBtn) $("diffBtn").focus({ preventScroll: true });
+  }
+  function pickDiff(i) {
+    closeDiff(true);
+    if (i === +$("diffSel").value) return;
+    SFX.ui?.();
+    $("diffSel").value = i;
+    $("diffSel").dispatchEvent(new Event("change"));
+  }
+  $("diffBtn").onclick = () => { SFX.ui?.(); $("diffMenu").hidden ? openDiff() : closeDiff(); };
+  document.addEventListener("pointerdown", e => { if (!e.target.closest(".stat-diff")) closeDiff(); });
+  $("diffMenu").addEventListener("keydown", e => {
+    const opts = [...$("diffMenu").children], k = opts.indexOf(document.activeElement);
+    if (e.key === "ArrowDown") { e.preventDefault(); opts[Math.min(opts.length - 1, k + 1)].focus(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); opts[Math.max(0, k - 1)].focus(); }
+    else if (e.key === "Escape") closeDiff(true);
+    else if (e.key === "Tab") closeDiff();
+  });
   $("titleUnlockBtn").onclick = () => showLock(false);
   $("relockBtn").onclick = () => { setUnlocked(false); $("titleUnlockBtn").focus(); };
   $("buyBtn").onclick = () => setUnlocked(true, "Full game unlocked. Enjoy endless puzzles.");
@@ -889,6 +952,7 @@ if (typeof document !== "undefined") (function () {
       newPuzzle(unlocked ? 24680 : undefined);
     }
     updateLockUI();
+    syncDiff();
   }
   // title screen <-> game
   function showGame(animate = true) {

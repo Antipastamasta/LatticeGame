@@ -531,6 +531,13 @@ const SFX = (function () {
     o.start(t); o.stop(t + attack + decay + 0.05);
   }
 
+  // a muted woodblock: a tiny noise strike ringing through two resonant modes, plus a hint of body
+  function wood(t, f, level) {
+    noiseBurst(t, { freq: f, q: 7, peak: 2.8 * level, attack: 0.0015, decay: 0.065, wetAmt: 0.3 });
+    noiseBurst(t, { freq: f * 2.62, q: 8, peak: 0.8 * level, attack: 0.001, decay: 0.025, wetAmt: 0.2 });
+    tone(t, { freq: f * 0.5, to: f * 0.46, peak: 0.14 * level, attack: 0.001, decay: 0.04, wetAmt: 0.2 });
+  }
+
   return {
     get on() { return on; },
     toggle() {
@@ -539,12 +546,10 @@ const SFX = (function () {
       if (on) this.ui();
       return on;
     },
-    // placing a dot: a deep, wooden click
+    // placing a dot: a muted woodblock tap
     tap() {
-      if (!ready()) return; const t = ctx.currentTime + 0.005;
-      tone(t, { freq: 275, to: 110, peak: 0.34, attack: 0.003, decay: 0.22, wetAmt: 0.38 });
-      tone(t, { freq: 550, to: 350, peak: 0.045, attack: 0.002, decay: 0.1, wetAmt: 0.38 });
-      noiseBurst(t, { type: "lowpass", freq: 1900, q: 0.7, peak: 0.08, attack: 0.002, decay: 0.05, wetAmt: 0.3 });
+      if (!ready()) return;
+      wood(ctx.currentTime + 0.005, 820, 1);
     },
     // cutting a circle: a breathy swish with a quiet glassy note
     slice(i = 0, delay = 0) {
@@ -554,23 +559,21 @@ const SFX = (function () {
       tone(t + 0.03, { freq: n, peak: 0.1, attack: 0.006, decay: 1.4, wetAmt: 0.6 });
       tone(t + 0.03, { freq: n * 2.003, peak: 0.018, attack: 0.004, decay: 0.7, wetAmt: 0.6 });
     },
-    // a move that isn't allowed: two muffled low knocks
+    // a move that isn't allowed: two low, dull knocks
     bad() {
       if (!ready()) return; const t = ctx.currentTime + 0.005;
-      tone(t, { freq: 215, to: 150, peak: 0.26, attack: 0.003, decay: 0.16, wetAmt: 0.25 });
-      tone(t + 0.1, { freq: 190, to: 130, peak: 0.21, attack: 0.003, decay: 0.18, wetAmt: 0.25 });
+      wood(t, 470, 0.85);
+      wood(t + 0.11, 420, 0.7);
     },
-    // undo: a softer, lower click
+    // undo: a softer, lower tap
     undo() {
       if (!ready()) return; const t = ctx.currentTime + 0.005;
-      tone(t, { freq: 210, to: 90, peak: 0.27, attack: 0.003, decay: 0.2, wetAmt: 0.35 });
-      noiseBurst(t, { type: "lowpass", freq: 1400, q: 0.7, peak: 0.06, attack: 0.002, decay: 0.045, wetAmt: 0.3 });
+      wood(t, 640, 0.75);
     },
     // buttons: a tiny, muted tick
     ui() {
       if (!ready()) return; const t = ctx.currentTime + 0.005;
-      tone(t, { freq: 350, to: 185, peak: 0.09, attack: 0.002, decay: 0.1, wetAmt: 0.3 });
-      noiseBurst(t, { type: "lowpass", freq: 2300, q: 0.7, peak: 0.04, attack: 0.002, decay: 0.03, wetAmt: 0.25 });
+      wood(t, 1150, 0.22);
     },
     // solved: a slow, rising pentatonic chime
     win(stars = 3) {

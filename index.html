@@ -542,9 +542,9 @@ const SFX = (function () {
     // placing a dot: a deep, wooden click
     tap() {
       if (!ready()) return; const t = ctx.currentTime + 0.005;
-      tone(t, { freq: 153, to: 60, peak: 0.38, attack: 0.003, decay: 0.22, wetAmt: 0.38 });
-      tone(t, { freq: 307, to: 195, peak: 0.05, attack: 0.002, decay: 0.1, wetAmt: 0.38 });
-      noiseBurst(t, { type: "lowpass", freq: 1150, q: 0.7, peak: 0.09, attack: 0.002, decay: 0.05, wetAmt: 0.3 });
+      tone(t, { freq: 275, to: 110, peak: 0.34, attack: 0.003, decay: 0.22, wetAmt: 0.38 });
+      tone(t, { freq: 550, to: 350, peak: 0.045, attack: 0.002, decay: 0.1, wetAmt: 0.38 });
+      noiseBurst(t, { type: "lowpass", freq: 1900, q: 0.7, peak: 0.08, attack: 0.002, decay: 0.05, wetAmt: 0.3 });
     },
     // cutting a circle: a breathy swish with a quiet glassy note
     slice(i = 0, delay = 0) {
@@ -557,20 +557,20 @@ const SFX = (function () {
     // a move that isn't allowed: two muffled low knocks
     bad() {
       if (!ready()) return; const t = ctx.currentTime + 0.005;
-      tone(t, { freq: 120, to: 83, peak: 0.3, attack: 0.003, decay: 0.16, wetAmt: 0.25 });
-      tone(t + 0.1, { freq: 107, to: 73, peak: 0.24, attack: 0.003, decay: 0.18, wetAmt: 0.25 });
+      tone(t, { freq: 215, to: 150, peak: 0.26, attack: 0.003, decay: 0.16, wetAmt: 0.25 });
+      tone(t + 0.1, { freq: 190, to: 130, peak: 0.21, attack: 0.003, decay: 0.18, wetAmt: 0.25 });
     },
     // undo: a softer, lower click
     undo() {
       if (!ready()) return; const t = ctx.currentTime + 0.005;
-      tone(t, { freq: 117, to: 49, peak: 0.3, attack: 0.003, decay: 0.2, wetAmt: 0.35 });
-      noiseBurst(t, { type: "lowpass", freq: 850, q: 0.7, peak: 0.06, attack: 0.002, decay: 0.045, wetAmt: 0.3 });
+      tone(t, { freq: 210, to: 90, peak: 0.27, attack: 0.003, decay: 0.2, wetAmt: 0.35 });
+      noiseBurst(t, { type: "lowpass", freq: 1400, q: 0.7, peak: 0.06, attack: 0.002, decay: 0.045, wetAmt: 0.3 });
     },
     // buttons: a tiny, muted tick
     ui() {
       if (!ready()) return; const t = ctx.currentTime + 0.005;
-      tone(t, { freq: 195, to: 104, peak: 0.1, attack: 0.002, decay: 0.1, wetAmt: 0.3 });
-      noiseBurst(t, { type: "lowpass", freq: 1400, q: 0.7, peak: 0.04, attack: 0.002, decay: 0.03, wetAmt: 0.25 });
+      tone(t, { freq: 350, to: 185, peak: 0.09, attack: 0.002, decay: 0.1, wetAmt: 0.3 });
+      noiseBurst(t, { type: "lowpass", freq: 2300, q: 0.7, peak: 0.04, attack: 0.002, decay: 0.03, wetAmt: 0.25 });
     },
     // solved: a slow, rising pentatonic chime
     win(stars = 3) {

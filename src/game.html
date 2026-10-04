@@ -135,6 +135,10 @@ select { padding: 7px 12px; }
 .hap-corner { right: 60px; }
 .sound-btn .hap-body { fill: none; }
 .hap-btn[hidden] { display: none !important; }
+.hap-tap { position: absolute; inset: 0; border-radius: inherit; cursor: inherit; -webkit-tap-highlight-color: transparent; }
+.hap-tap.hap-board { position: static; display: contents; }
+.hap-switch { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; opacity: 0; overflow: hidden; clip-path: inset(50%); pointer-events: none; }
+.hap-ios #board > * { pointer-events: none; }
 .help-row { gap: 10px; align-items: center; }
 
 /* free version + unlock */
@@ -603,8 +607,12 @@ const SFX = (function () {
 })();
 
 // Haptics: small taps that follow the sounds. Uses the native Capacitor plugin when the
-// game runs as an app, navigator.vibrate on Android browsers, and the iOS 18+ switch
-// control trick in Safari (a single system tick, no strength control).
+// game runs as an app and navigator.vibrate on Android browsers. iPhone Safari has no
+// vibration API; its only haptic is the system tick of <input type=checkbox switch>, and
+// since iOS 26.5 that tick fires only when a real tap lands on a label holding the switch.
+// So on iPhone, buttons get an invisible overlay label and the board sits inside one, and
+// the tap's click is cancelled when no tick is wanted. Delayed taps (slices, win pattern)
+// fall back to label.click(), which only ticks on older iOS.
 const HAPTIC = (function () {
   let on = true;
   try { on = localStorage.getItem("lattice.haptics") !== "0"; } catch (e) {}
@@ -614,7 +622,8 @@ const HAPTIC = (function () {
     (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
   const touch = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
   const supported = !!native() || (touch && (canVibrate || isIOS));
-  let label = null;
+  const iosTap = isIOS && !native() && !canVibrate;
+  let want = false, label = null;
   function iosTick() {
     if (!label) {
       label = document.createElement("label");
@@ -635,7 +644,56 @@ const HAPTIC = (function () {
   }
   function at(delay, strength, ms) {
     if (!on) return;
+    if (iosTap && delay <= 0) { want = true; return; }   // the tap's own label gives the tick
     if (delay <= 0) pulse(strength, ms); else setTimeout(() => pulse(strength, ms), delay * 1000);
+  }
+  function hapSwitch() {
+    const input = document.createElement("input");
+    input.type = "checkbox"; input.setAttribute("switch", ""); input.inert = true;
+    input.tabIndex = -1; input.className = "hap-switch";
+    // the label forwards a click to the switch; keep it from reaching the button a second time
+    input.addEventListener("click", e => e.stopPropagation());
+    return input;
+  }
+  function overlay(b) {
+    if (b.querySelector(":scope > label.hap-tap")) return;
+    if (getComputedStyle(b).position === "static") b.style.position = "relative";
+    const l = document.createElement("label");
+    l.className = "hap-tap"; l.setAttribute("aria-hidden", "true");
+    l.appendChild(hapSwitch()); b.appendChild(l);
+  }
+  function wrapBoard(svg) {
+    if (!svg || svg.parentElement.classList.contains("hap-tap")) return;
+    const l = document.createElement("label");
+    l.className = "hap-tap hap-board"; l.setAttribute("aria-hidden", "true");
+    svg.before(l); l.appendChild(hapSwitch()); l.appendChild(svg);
+  }
+  function installIOS() {
+    document.documentElement.classList.add("hap-ios");
+    document.querySelectorAll("button").forEach(overlay);
+    wrapBoard(document.getElementById("board"));
+    // new buttons, and buttons whose contents were rewritten, get their overlay (back)
+    new MutationObserver(ms => ms.forEach(m => {
+      const host = m.target.closest?.("button");
+      if (host) overlay(host);
+      m.addedNodes.forEach(n => {
+        if (n.nodeType !== 1) return;
+        if (n.tagName === "BUTTON") overlay(n); else n.querySelectorAll?.("button").forEach(overlay);
+      });
+    })).observe(document.body, { childList: true, subtree: true });
+    // runs after the game's own handlers: buttons tick when haptics are on; the board ticks
+    // only when the move asked for one
+    window.addEventListener("click", e => {
+      const l = e.target.closest?.("label.hap-tap");
+      if (!l || e.target.tagName === "INPUT") return;
+      const tick = on && !l.closest("button:disabled") && (!l.classList.contains("hap-board") || want);
+      want = false;
+      if (!tick) e.preventDefault();
+    });
+  }
+  if (iosTap && touch) {
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", installIOS);
+    else installIOS();
   }
   return {
     supported,
@@ -787,7 +845,8 @@ if (typeof document !== "undefined") (function () {
       <small>${segs} line${segs === 1 ? "" : "s"}, par ${L.par}.${segs > L.par ? " Can you find a shorter route?" : ""}</small></div>`;
     const b = document.createElement("button");
     b.type = "button"; b.textContent = segs > L.par ? "Try again" : "Next puzzle";
-    b.onclick = () => segs > L.par ? reset() : newPuzzle();
+    // next tick, so the card (and the iPhone haptic label inside it) outlives this tap
+    b.onclick = () => setTimeout(() => segs > L.par ? reset() : newPuzzle());
     box.appendChild(b);
     $("boardWrap").after(box);
   }
@@ -1325,7 +1384,9 @@ if (typeof document !== "undefined") (function () {
     $("tutPrev").disabled = idx === 0;
     const last = idx === SLIDES.length - 1, nb = $("tutNext");
     nb.className = last ? "primary tut-play" : "tut-arrow primary";
+    const tap = nb.querySelector(":scope > label.hap-tap");   // keep the iPhone haptic overlay
     nb.innerHTML = last ? "Let's play" : `<svg viewBox="0 0 20 20"><path d="M7.5 4l6 6-6 6"/></svg>`;
+    if (tap) nb.appendChild(tap);
     nb.setAttribute("aria-label", last ? "Close and play" : "Next");
     [...$("tutDots").children].forEach((d, k) => d.classList.toggle("on", k === idx));
     frame();

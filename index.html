@@ -531,11 +531,12 @@ const SFX = (function () {
     o.start(t); o.stop(t + attack + decay + 0.05);
   }
 
-  // a muted woodblock: a tiny noise strike ringing through two resonant modes, plus a hint of body
+  // a woodblock struck with a rubber mallet: a rounded, slower strike, the bright upper mode
+  // mostly damped, and a soft thud of body underneath
   function wood(t, f, level) {
-    noiseBurst(t, { freq: f, q: 7, peak: 2.8 * level, attack: 0.0015, decay: 0.065, wetAmt: 0.3 });
-    noiseBurst(t, { freq: f * 2.62, q: 8, peak: 0.8 * level, attack: 0.001, decay: 0.025, wetAmt: 0.2 });
-    tone(t, { freq: f * 0.5, to: f * 0.46, peak: 0.14 * level, attack: 0.001, decay: 0.04, wetAmt: 0.2 });
+    noiseBurst(t, { freq: f, q: 7, peak: 2.5 * level, attack: 0.005, decay: 0.07, wetAmt: 0.3 });
+    noiseBurst(t, { freq: f * 2.62, q: 8, peak: 0.22 * level, attack: 0.006, decay: 0.02, wetAmt: 0.15 });
+    tone(t, { freq: f * 0.5, to: f * 0.44, peak: 0.2 * level, attack: 0.004, decay: 0.05, wetAmt: 0.2 });
   }
 
   return {

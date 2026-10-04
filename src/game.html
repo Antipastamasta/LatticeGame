@@ -132,6 +132,9 @@ select { padding: 7px 12px; }
 .sound-btn.off svg { stroke: var(--muted); } .sound-btn.off .spk { fill: var(--muted); }
 .sound-corner { position: absolute; top: calc(16px + env(safe-area-inset-top, 0px)); right: 16px; border-color: transparent; background: transparent; }
 .sound-corner:hover:not(:disabled) { border-color: var(--line); }
+.hap-corner { right: 60px; }
+.sound-btn .hap-body { fill: none; }
+.hap-btn[hidden] { display: none !important; }
 .help-row { gap: 10px; align-items: center; }
 
 /* free version + unlock */
@@ -182,6 +185,7 @@ select { padding: 7px 12px; }
 </style>
 
 <section class="title-screen" id="titleScreen">
+  <button id="hapBtnTitle" type="button" class="sound-btn sound-corner hap-corner hap-btn" aria-label="Vibration" hidden><svg viewBox="0 0 20 20"><rect class="hap-body" x="6.5" y="3" width="7" height="14" rx="1.8"/><path class="wave" d="M3.6 7.5v5M1.6 8.8v2.4M16.4 7.5v5M18.4 8.8v2.4"/><path class="mute" d="M3.5 3.5l13 13"/></svg></button>
   <button id="soundBtnTitle" type="button" class="sound-btn sound-corner" aria-label="Sound"><svg viewBox="0 0 20 20"><path class="spk" d="M3.5 7.5h3l4-3.5v12l-4-3.5h-3z"/><path class="wave" d="M13.5 7.2a4 4 0 0 1 0 5.6M15.8 5a7 7 0 0 1 0 10"/><path class="mute" d="M13.5 7.5l5 5M18.5 7.5l-5 5"/></svg></button>
   <div class="title-inner">
     <div class="emblem" aria-hidden="true"><svg id="emblem"></svg></div>
@@ -239,6 +243,7 @@ select { padding: 7px 12px; }
 
   <div class="help-row">
     <button id="helpBtn" type="button" class="help-btn"><i>?</i>How to play</button>
+    <button id="hapBtn" type="button" class="sound-btn hap-btn" aria-label="Vibration" hidden><svg viewBox="0 0 20 20"><rect class="hap-body" x="6.5" y="3" width="7" height="14" rx="1.8"/><path class="wave" d="M3.6 7.5v5M1.6 8.8v2.4M16.4 7.5v5M18.4 8.8v2.4"/><path class="mute" d="M3.5 3.5l13 13"/></svg></button>
     <button id="soundBtn" type="button" class="sound-btn" aria-label="Sound"><svg viewBox="0 0 20 20"><path class="spk" d="M3.5 7.5h3l4-3.5v12l-4-3.5h-3z"/><path class="wave" d="M13.5 7.2a4 4 0 0 1 0 5.6M15.8 5a7 7 0 0 1 0 10"/><path class="mute" d="M13.5 7.5l5 5M18.5 7.5l-5 5"/></svg></button>
   </div>
 
@@ -596,6 +601,63 @@ const SFX = (function () {
     },
   };
 })();
+
+// Haptics: small taps that follow the sounds. Uses the native Capacitor plugin when the
+// game runs as an app, navigator.vibrate on Android browsers, and the iOS 18+ switch
+// control trick in Safari (a single system tick, no strength control).
+const HAPTIC = (function () {
+  let on = true;
+  try { on = localStorage.getItem("lattice.haptics") !== "0"; } catch (e) {}
+  const native = () => window.Capacitor?.Plugins?.Haptics;
+  const canVibrate = typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
+  const isIOS = typeof navigator !== "undefined" &&
+    (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+  const touch = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  const supported = !!native() || (touch && (canVibrate || isIOS));
+  let label = null;
+  function iosTick() {
+    if (!label) {
+      label = document.createElement("label");
+      label.setAttribute("aria-hidden", "true");
+      label.style.display = "none";
+      const input = document.createElement("input");
+      input.type = "checkbox"; input.setAttribute("switch", "");
+      label.appendChild(input); document.body.appendChild(label);
+    }
+    label.click();
+  }
+  // strength: "light" | "medium" | "heavy"; ms: Android pulse length
+  function pulse(strength, ms) {
+    const n = native();
+    if (n) { n.impact({ style: strength.toUpperCase() }).catch(() => {}); return; }
+    if (canVibrate) { try { navigator.vibrate(ms); } catch (e) {} return; }
+    if (isIOS) { try { iosTick(); } catch (e) {} }
+  }
+  function at(delay, strength, ms) {
+    if (!on) return;
+    if (delay <= 0) pulse(strength, ms); else setTimeout(() => pulse(strength, ms), delay * 1000);
+  }
+  return {
+    supported,
+    get on() { return on; },
+    toggle() {
+      on = !on;
+      try { localStorage.setItem("lattice.haptics", on ? "1" : "0"); } catch (e) {}
+      if (on) at(0, "medium", 14);
+      return on;
+    },
+    tap() { at(0, "light", 8); },
+    slice(i = 0, delay = 0) { at(0.04 + delay, "medium", 16); },
+    bad() { at(0, "medium", 12); at(0.11, "light", 10); },
+    undo() { at(0, "light", 6); },
+    ui() { at(0, "light", 5); },
+    win(stars = 3) {
+      const n = stars === 3 ? 4 : 3;
+      for (let j = 0; j < n; j++) at(0.15 + j * 0.13, j === n - 1 ? "heavy" : "medium", j === n - 1 ? 26 : 14);
+    },
+    miss() { at(0.1, "light", 12); at(0.26, "light", 10); },
+  };
+})();
 </script>
 
 <script>
@@ -741,21 +803,22 @@ if (typeof document !== "undefined") (function () {
     const L = S.level, last = S.path[S.path.length - 1];
     if (same(q, last)) { if (S.path.length > 1) undo(); return; }
     const bad = checkMove(S.path, q);
-    if (bad) { SFX.bad?.(); setMsg(REASONS[bad] || "That move isn't allowed.", "bad"); render(); return; }
+    if (bad) { SFX.bad?.(); HAPTIC.bad(); setMsg(REASONS[bad] || "That move isn't allowed.", "bad"); render(); return; }
     const before = slicedSet(S.path);
     S.path.push(q); S.newSeg = true;
     const sliced = slicedSet(S.path);
     const left = L.circles.length - sliced.size;
     // sound: a click for the dot, then a slice for each new circle in the order the line meets them
-    SFX.tap?.();
+    SFX.tap?.(); HAPTIC.tap();
     const dx = q[0] - last[0], dy = q[1] - last[1], len2 = dx * dx + dy * dy;
     [...sliced.keys()].filter(i => !before.has(i))
       .map(i => ({ i, u: ((L.circles[i].x - last[0]) * dx + (L.circles[i].y - last[1]) * dy) / len2 }))
       .sort((a, b) => a.u - b.u)
-      .forEach((c, k) => SFX.slice?.(before.size + k, 0.05 + Math.max(0, Math.min(1, c.u)) * 0.14 + k * 0.03));
+      .forEach((c, k) => { const d = 0.05 + Math.max(0, Math.min(1, c.u)) * 0.14 + k * 0.03; SFX.slice?.(before.size + k, d); HAPTIC.slice(before.size + k, d); });
     if (same(q, L.end)) {
       const lines = S.path.length - 1;
-      if (left === 0) SFX.win?.(lines <= L.par ? 3 : lines === L.par + 1 ? 2 : 1); else SFX.miss?.();
+      const stars = lines <= L.par ? 3 : lines === L.par + 1 ? 2 : 1;
+      if (left === 0) { SFX.win?.(stars); HAPTIC.win(stars); } else { SFX.miss?.(); HAPTIC.miss(); }
     }
     if (same(q, L.end)) {
       S.done = true;
@@ -772,7 +835,7 @@ if (typeof document !== "undefined") (function () {
   }
   function undo() {
     if (S.path.length <= 1) return;
-    SFX.undo?.();
+    SFX.undo?.(); HAPTIC.undo();
     S.path.pop(); S.done = false;
     setMsg("Took back the last line.");
     render();
@@ -801,7 +864,7 @@ if (typeof document !== "undefined") (function () {
       b.type = "button";
       b.className = (progress[pkey(L.diff, sd)] ? "solved" : "") + (k === S.demoIdx ? " current" : "");
       b.setAttribute("aria-label", `Free puzzle ${k + 1}`);
-      b.onclick = () => { SFX.ui?.(); loadDemo(k); };
+      b.onclick = () => { SFX.ui?.(); HAPTIC.ui(); loadDemo(k); };
       pips.appendChild(b);
     });
   }
@@ -880,9 +943,9 @@ if (typeof document !== "undefined") (function () {
   svg.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") setHover(null); });
 
   $("undoBtn").onclick = undo;
-  $("resetBtn").onclick = () => { SFX.ui?.(); reset(); };
-  $("newBtn").onclick = () => { SFX.ui?.(); newPuzzle(); };
-  $("solveBtn").onclick = () => { SFX.ui?.(); S.showSol = !S.showSol; render(); };
+  $("resetBtn").onclick = () => { SFX.ui?.(); HAPTIC.ui(); reset(); };
+  $("newBtn").onclick = () => { SFX.ui?.(); HAPTIC.ui(); newPuzzle(); };
+  $("solveBtn").onclick = () => { SFX.ui?.(); HAPTIC.ui(); S.showSol = !S.showSol; render(); };
   function syncSound() {
     ["soundBtn", "soundBtnTitle"].forEach(id => {
       const b = $(id); b.classList.toggle("off", !SFX.on);
@@ -891,6 +954,15 @@ if (typeof document !== "undefined") (function () {
     });
   }
   ["soundBtn", "soundBtnTitle"].forEach(id => { $(id).onclick = () => { SFX.toggle?.(); syncSound(); }; });
+  function syncHap() {
+    ["hapBtn", "hapBtnTitle"].forEach(id => {
+      const b = $(id); b.hidden = !HAPTIC.supported; b.classList.toggle("off", !HAPTIC.on);
+      b.setAttribute("aria-label", HAPTIC.on ? "Vibration on. Tap to turn off" : "Vibration off. Tap to turn on");
+      b.setAttribute("aria-pressed", String(HAPTIC.on));
+    });
+  }
+  ["hapBtn", "hapBtnTitle"].forEach(id => { $(id).onclick = () => { HAPTIC.toggle(); SFX.ui?.(); syncHap(); }; });
+  syncHap();
   syncSound();
   $("diffSel").onchange = () => { store("lattice.diff", $("diffSel").value); S.demoIdx = null; newPuzzle(); syncDiff(); };
 
@@ -923,11 +995,11 @@ if (typeof document !== "undefined") (function () {
   function pickDiff(i) {
     closeDiff(true);
     if (i === +$("diffSel").value) return;
-    SFX.ui?.();
+    SFX.ui?.(); HAPTIC.ui();
     $("diffSel").value = i;
     $("diffSel").dispatchEvent(new Event("change"));
   }
-  $("diffBtn").onclick = () => { SFX.ui?.(); $("diffMenu").hidden ? openDiff() : closeDiff(); };
+  $("diffBtn").onclick = () => { SFX.ui?.(); HAPTIC.ui(); $("diffMenu").hidden ? openDiff() : closeDiff(); };
   document.addEventListener("pointerdown", e => { if (!e.target.closest(".stat-diff")) closeDiff(); });
   $("diffMenu").addEventListener("keydown", e => {
     const opts = [...$("diffMenu").children], k = opts.indexOf(document.activeElement);
@@ -968,8 +1040,8 @@ if (typeof document !== "undefined") (function () {
     if (animate && !matchMedia("(prefers-reduced-motion: reduce)").matches) { t.classList.add("leaving"); setTimeout(go, 280); } else go();
   }
   function showTitle() { $("app").hidden = true; $("titleScreen").hidden = false; }
-  $("playBtn").onclick = () => { SFX.ui?.(); showGame(); };
-  $("homeBtn").onclick = () => { SFX.ui?.(); showTitle(); };
+  $("playBtn").onclick = () => { SFX.ui?.(); HAPTIC.ui(); showGame(); };
+  $("homeBtn").onclick = () => { SFX.ui?.(); HAPTIC.ui(); showTitle(); };
   document.querySelectorAll("[data-game-name]").forEach(e => { e.textContent = GAME_NAME; });
 
   // emblem: a small solved puzzle that draws itself on the title screen
@@ -1289,11 +1361,11 @@ if (typeof document !== "undefined") (function () {
     d.onclick = () => show(k);
     $("tutDots").appendChild(d);
   });
-  $("helpBtn").onclick = () => { SFX.ui?.(); open(); };
-  $("titleHelpBtn").onclick = () => { SFX.ui?.(); open(); };
+  $("helpBtn").onclick = () => { SFX.ui?.(); HAPTIC.ui(); open(); };
+  $("titleHelpBtn").onclick = () => { SFX.ui?.(); HAPTIC.ui(); open(); };
   $("tutClose").onclick = close;
-  $("tutPrev").onclick = () => { SFX.ui?.(); show(idx - 1); };
-  $("tutNext").onclick = () => { SFX.ui?.(); idx === SLIDES.length - 1 ? close() : show(idx + 1); };
+  $("tutPrev").onclick = () => { SFX.ui?.(); HAPTIC.ui(); show(idx - 1); };
+  $("tutNext").onclick = () => { SFX.ui?.(); HAPTIC.ui(); idx === SLIDES.length - 1 ? close() : show(idx + 1); };
   $("tut").addEventListener("click", e => { if (e.target === $("tut")) close(); });
   document.addEventListener("keydown", e => {
     if ($("tut").hidden) return;

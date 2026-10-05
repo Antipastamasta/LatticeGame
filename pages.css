@@ -1,0 +1,12 @@
+@font-face { font-family: "Bricolage Grotesque"; font-weight: 500 700; font-display: swap; src: url(fonts/bricolage-grotesque-latin.woff2) format("woff2"); }
+:root { color-scheme: light; --bg: #f6f7f5; --ink: #15171c; --muted: #6b7078; --line: #dfe2e0; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-text-size-adjust: 100%; }
+main { max-width: 640px; margin: 0 auto; padding: max(24px, env(safe-area-inset-top)) 16px 48px; }
+h1, h2 { font-family: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif; letter-spacing: -0.01em; line-height: 1.15; }
+h1 { font-size: 32px; margin: 8px 0 4px; }
+h2 { font-size: 19px; margin: 28px 0 6px; }
+p { margin: 0 0 12px; }
+a { color: var(--ink); text-underline-offset: 3px; }
+.meta { color: var(--muted); font-size: 14px; }
+.back a { color: var(--muted); font-size: 14px; text-decoration: none; }
+.back a::before { content: "← "; }

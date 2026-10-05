@@ -1,0 +1,47 @@
+# Codemagic cloud builds for Lattice (https://codemagic.io). No Mac needed.
+#
+# One-time setup in Codemagic (see CLAUDE.md, "App Store setup"):
+#   - Team settings > Integrations > Developer Portal: add the App Store Connect API key,
+#     named exactly "Lattice App Store Connect".
+#   - Team settings > codemagic.yaml settings > Code signing identities:
+#     an Apple Distribution certificate and an App Store provisioning profile
+#     for com.lonelightgaming.lattice.
+#
+# Start a build: Codemagic > Lattice > Start new build > "iOS to TestFlight".
+
+workflows:
+  ios-testflight:
+    name: iOS to TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 45
+    integrations:
+      app_store_connect: Lattice App Store Connect
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.lonelightgaming.lattice
+      node: 22
+      xcode: latest
+    scripts:
+      - name: Install packages
+        script: npm ci
+      - name: Build the web bundle
+        script: python3 build.py
+      - name: Copy it into the iOS project
+        script: npx cap sync ios
+      - name: Apply signing profiles
+        script: xcode-project use-profiles
+      - name: Build the signed app
+        # Codemagic's build counter becomes the iOS build number, so every upload is unique
+        script: |
+          xcode-project build-ipa \
+            --project ios/App/App.xcodeproj \
+            --scheme App \
+            --archive-xcargs "COMPILER_INDEX_STORE_ENABLE=NO CURRENT_PROJECT_VERSION=$BUILD_NUMBER"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

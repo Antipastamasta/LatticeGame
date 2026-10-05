@@ -1,0 +1,22 @@
+{
+  "name": "lattice",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lattice puzzle game: web page plus Capacitor iOS/Android app",
+  "scripts": {
+    "build": "python3 build.py",
+    "sync": "python3 build.py && npx cap sync"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.5.2",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
+    "@revenuecat/purchases-capacitor": "^13.7.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.2"
+  }
+}

@@ -3,22 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f7f5">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Lattice">
-<meta name="theme-color" content="#f6f7f5">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
 <title>Lattice Puzzle</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
+@font-face { font-family: "Bricolage Grotesque"; font-style: normal; font-weight: 500 700; font-display: swap; src: url(fonts/bricolage-grotesque-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url(fonts/ibm-plex-mono-400-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url(fonts/ibm-plex-mono-500-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 :root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); touch-action: manipulation; }
 body { margin: 0; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; background: #f6f7f5; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
 img { max-width: 100%; }
 [hidden] { display: none !important; }
+
 </style>
 </head>
 <body>
@@ -291,7 +293,7 @@ select { padding: 7px 12px; }
         <button id="buyBtn" type="button" class="primary"></button>
         <button id="restoreBtn" type="button">Restore purchase</button>
       </div>
-      <p class="lock-note">Demo only. No payment is taken.</p>
+      <p class="lock-note" id="lockNote">Demo only. No payment is taken.</p>
     </div>
   </div>
 
@@ -330,7 +332,11 @@ const EXACT_MAX = 4;         // up to this many lines the solver tries every rou
 const SOLVER_MAX = 6;
 const GAME_NAME = "Lattice";
 const FREE_SEEDS = [1001, 1004, 1002, 1003, 1000];   // the 5 free puzzles per difficulty, easiest first
-const PRICE_LABEL = "$2.99";                         // placeholder price for the full-game unlock
+const PRICE_LABEL = "$2.99";                         // web price label; the app shows the store's local price
+// In-app purchase, via RevenueCat. The public SDK keys are safe to ship in the app; empty until RevenueCat is set up.
+const RC_KEY_IOS = "";                               // RevenueCat Apple app key, starts with "appl_"
+const RC_KEY_ANDROID = "";                           // RevenueCat Google app key, starts with "goog_"
+const UNLOCK_ENTITLEMENT = "full";                   // RevenueCat entitlement granted by the lattice_full_unlock product
 const GRID_SIZE = 6;           // fixed for now; generate() and the board still handle any size        // beyond EXACT_MAX it only tries routes where each line slices something new
 
 function mulberry32(a) {
@@ -737,6 +743,48 @@ const HAPTIC = (function () {
     miss() { at(0.1, "light", 12); at(0.26, "light", 10); },
   };
 })();
+// Store: the real one-time unlock in the iOS/Android app (RevenueCat plugin, reached through
+// Capacitor's plugin bridge), a pretend one on the web. buy() and restore() resolve true when
+// the player owns the unlock, false when the store says they don't, and reject on errors;
+// a player closing the payment sheet rejects with cancelled(err) === true.
+const STORE = (function () {
+  const cap = typeof window !== "undefined" ? window.Capacitor : null;
+  const native = !!cap?.isNativePlatform?.();
+  const platform = cap?.getPlatform?.();
+  const key = platform === "ios" ? RC_KEY_IOS : platform === "android" ? RC_KEY_ANDROID : "";
+  const rc = () => cap?.Plugins?.Purchases;
+  let pkg = null, ready = null;
+  const owns = info => !!info?.entitlements?.active?.[UNLOCK_ENTITLEMENT];
+  function init() {
+    if (!native) return Promise.resolve();
+    if (!key || !rc()) return Promise.reject(new Error("The store isn't set up yet."));
+    if (!ready) {
+      ready = rc().configure({ apiKey: key })
+        .then(() => rc().getOfferings())
+        .then(o => { pkg = o?.current?.availablePackages?.[0] || null; })
+        .catch(e => { ready = null; throw e; });
+    }
+    return ready;
+  }
+  return {
+    native,
+    price: () => pkg?.product?.priceString || PRICE_LABEL,
+    init,
+    async owned() { await init(); return native ? owns((await rc().getCustomerInfo()).customerInfo) : null; },
+    async buy() {
+      if (!native) return true;
+      await init();
+      if (!pkg) throw new Error("The unlock isn't available right now.");
+      return owns((await rc().purchasePackage({ aPackage: pkg })).customerInfo);
+    },
+    async restore() {
+      if (!native) return true;
+      await init();
+      return owns((await rc().restorePurchases()).customerInfo);
+    },
+    cancelled: e => !!(e && (e.userCancelled || String(e.code) === "1" || e.data?.userCancelled)),
+  };
+})();
 </script>
 
 <script>
@@ -957,16 +1005,24 @@ if (typeof document !== "undefined") (function () {
   function updateLockUI() {
     $("newBtn").textContent = unlocked ? "New puzzle" : "Next puzzle";
     $("titleUnlockBtn").hidden = unlocked;
-    $("relockBtn").hidden = !unlocked;
+    $("relockBtn").hidden = !unlocked || STORE.native;   // testing shortcut, web only
+  }
+  const LOCK_NOTE = STORE.native ? "One-time purchase. Restore it free on any of your devices." : "Demo only. No payment is taken.";
+  function lockBusy(busy, note) {
+    $("buyBtn").disabled = $("restoreBtn").disabled = busy;
+    $("lockNote").textContent = note || LOCK_NOTE;
   }
   function showLock(fromEnd) {
     const name = DIFFS[+$("diffSel").value].name;
     $("lockText").textContent = fromEnd
       ? `You've played all ${FREE_SEEDS.length} free ${name} puzzles. Unlock the full game for endless new ones.`
       : "Get endless new puzzles on every difficulty.";
-    $("buyBtn").textContent = `Unlock for ${PRICE_LABEL}`;
+    $("buyBtn").textContent = `Unlock for ${STORE.price()}`;
+    lockBusy(false);
     $("lock").hidden = false;
     $("buyBtn").focus();
+    // in the app, fetch the local price; it fills in once the store answers
+    if (STORE.native) STORE.init().then(() => { $("buyBtn").textContent = `Unlock for ${STORE.price()}`; }, () => {});
   }
   function hideLock() { $("lock").hidden = true; }
   function setUnlocked(v, note) {
@@ -977,6 +1033,28 @@ if (typeof document !== "undefined") (function () {
     S.demoIdx = null;
     newPuzzle();
     if (note && !$("app").hidden) setMsg(note, "good");
+  }
+  // buy or restore through the store, keeping the dialog open with a note on failure
+  async function storeAction(act, okNote, noneNote) {
+    lockBusy(true, act === STORE.buy ? "Connecting to the store…" : "Checking your purchases…");
+    try {
+      if (await act()) setUnlocked(true, okNote);
+      else lockBusy(false, noneNote);
+    } catch (e) {
+      lockBusy(false, STORE.cancelled(e) ? "" : (e?.message || "Something went wrong. Please try again."));
+    }
+  }
+  // in the app, the store is the source of truth: pick up a purchase made on another
+  // device or a refund, but keep the saved state when the store can't be reached
+  function syncOwned() {
+    if (!STORE.native) return;
+    STORE.owned().then(own => {
+      if (own === unlocked) return;
+      unlocked = own;
+      store("lattice.unlocked", own ? "1" : "0");
+      updateLockUI();
+      if (!own && S.demoIdx == null) newPuzzle(); else renderLabel();
+    }, () => {});
   }
 
   function newPuzzle(seed) {
@@ -1090,8 +1168,8 @@ if (typeof document !== "undefined") (function () {
   });
   $("titleUnlockBtn").onclick = () => showLock(false);
   $("relockBtn").onclick = () => { setUnlocked(false); $("titleUnlockBtn").focus(); };
-  $("buyBtn").onclick = () => setUnlocked(true, "Unlocked. Enjoy endless puzzles.");
-  $("restoreBtn").onclick = () => setUnlocked(true, "Restored. Enjoy endless puzzles.");
+  $("buyBtn").onclick = () => storeAction(STORE.buy, "Unlocked. Enjoy endless puzzles.", "The purchase didn't go through.");
+  $("restoreBtn").onclick = () => storeAction(STORE.restore, "Restored. Enjoy endless puzzles.", "No earlier purchase found for this account.");
   $("lockClose").onclick = hideLock;
   $("lock").addEventListener("click", e => { if (e.target === $("lock")) hideLock(); });
   document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("lock").hidden) hideLock(); });
@@ -1112,6 +1190,7 @@ if (typeof document !== "undefined") (function () {
     }
     updateLockUI();
     syncDiff();
+    syncOwned();
   }
   // title screen <-> game
   function showGame(animate = true) {

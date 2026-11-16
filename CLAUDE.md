@@ -57,7 +57,7 @@ Done:
 - iOS project, real purchase flow, icon, splash, fonts, Codemagic file, privacy and support pages (October 2026).
 
 Waiting on Michael:
-- He is moving. He will update the LLC address with Dun & Bradstreet and open a business bank account, then do Apple's bank, tax (W-9) and Small Business Program forms.
+- He has moved (by November 2026) and switched the LLC's NJ registered agent to Northwest Registered Agent. Next: update the LLC's main business address with NJ (Certificate of Amendment or annual report), IRS Form 8822-B and NJ Taxation, then open a business bank account, update Dun & Bradstreet, and do Apple's bank, tax (W-9) and Small Business Program forms.
 - Sign up for Codemagic (with GitHub) and RevenueCat.
 - A support email address for `support.html` (currently the placeholder `SUPPORT_EMAIL`).
 - Check the name "Lattice" on the App Store and in USPTO search; fallback "Lattice: Line Puzzle".
